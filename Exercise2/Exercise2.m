@@ -11,3 +11,12 @@
  data_ts = iddata(arma_data', [], 1);
  %% How do i estimate the arma params with the w and mu?
  armax(data_ts,[1 1])
+
+
+ %% EGARCH(1,1)
+ start_par = [0 0 0 0 0 ]
+ MLmax(@log_lik_EGARCH, start_par, egarchdata);
+
+
+ %% Extra
+ 
