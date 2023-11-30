@@ -38,14 +38,9 @@ xlabel('Time Step');
 ylabel('Short Rate');
 title('Kalman Filter Estimation of Short Rate');
 %%
-a= kappa
-b=theta
-s=sigma
-T=1/4
-Y = -1/T*(log(A(T,[1:N]', kappa, theta, sigma))-B(T,[1:N]', kappa, sigma).*x_estimates);
+Y3 = (log(A(x_estimates, kappa, theta, sigma))-B(x_estimates, kappa, sigma).*x_estimates);
 
-%%
-plot(1:N, yhat(:,3), 'b', 1:N, Y, 'r');
+plot(1:N, yhat(:,1), 'b', 1:N, Y3, 'r');
 legend('Observed', 'Estimated');
 xlabel('Time Step');
 ylabel('Short Rate');
