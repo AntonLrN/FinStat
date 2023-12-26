@@ -1,0 +1,499 @@
+ListA= [100.15 0.04 [105,100] 0.2460 [1.5 3.5]];
+
+
+y_ask = {OptData.Callask};
+y_bid = {OptData.Callbid};
+s_ask = {OptData.Sask};
+s_bid = {OptData.Sbid};
+r = {OptData.rf};
+tau = {OptData.tau};
+K = {OptData.K};
+y_mid = cell(length(y_bid),1);
+s_mid = cell(length(y_bid),1);
+for i =1:length(y_ask)
+    y_mid{i} = (y_ask{:,i} + y_bid{:,i})/2 +randn([ length(K{i}) 1])'/4 ;
+    s_mid{i} = (s_ask{:,i} + s_bid{:,i})/2+ +randn'/4;
+end
+N=length(OptData);
+y_mid_mat =  horzcat(y_mid{:});
+var_obs=var(y_mid_mat)
+%% test
+
+test = bns(100.15, 0.04,  100, 0.2460, 0.2)
+
+blsprice(100.15,100,0.04,0.2460,0.2)
+
+
+
+
+
+
+
+%%
+
+sigma_estimate = 0.20;  % Initial volatility estimate
+P = 1;                  % Initial estimation error covariance
+Q = 1e-4;               % Process noise variance
+R = 1e-4;               % Measurement noise variance
+maxIterations = 10;     % Maximum number of iterations for IEKF
+tolerance = 1e-6;       % Convergence tolerance
+%% Kalman Filter
+obs = y_mid
+s = s_mid
+X_est = zeros(1, N);
+ys = zeros(1, N)
+P = 1
+R = var_obs; %Meas noise
+Q = 1; % Process noise
+
+X=0.01 % this is the best estimate at every step, saved to my final X_est
+
+a1s = linspace(-0.999, 0.999, 1000)
+errort = zeros(1,N)
+errora = zeros(1,length(a1s))
+for i = 1:length(a1s)
+    err=0;
+    a1 = a1s(i);
+    X=0.01; 
+    P=1;
+for t=1:N
+    X_pred = a1*X;
+    P_pred = a1 * P * a1 + Q;
+    %Update/correction steps
+    %1. Check if we have one or two contracts:
+    d = length(K{t});
+    
+    if d == 2
+        y = obs{t}'; % Get the observation
+        y_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        err_t = (y - y_pred );% This should be 2x1
+        H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)' ;%2x1
+        S = H * P_pred*H' + R*eye(d);
+        Kg = P_pred * H' / S;
+        X = X_pred + Kg * err_t;
+        P = (1 - Kg * H) * P_pred;
+        
+    else
+        y = obs{t}; % Get the observation
+        y_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred);
+        err_t = (y - y_pred )';% This should be 2x1
+        H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)'; %2x1
+        S = H * P_pred*H' + R*eye(d);
+        Kg = P_pred * H' / S;
+        X = X_pred + Kg * err_t;
+        P = (1 - Kg * H) * P_pred;
+    end
+    X_est(:, t) = X;
+    err = sum(obs{t}.^2 -bns(s{t}, r{t}, K{t}, tau{t}, X).^2) + err;
+end
+% Calculate error:
+errora(i) = err/N;
+end
+[minValue, minIndex] = min(abs(errora))
+%% Manually try a1s:
+obs = y_mid
+s = s_mid
+X_est = zeros(1, N);
+ys = zeros(1, N)
+P = 1
+R = 2.5; %Meas noise
+Q = 1; % Process noise
+X=0.01 % this is the best estimate at every step, saved to my final X_est
+a1 =  a1s(minIndex)
+for t=1:N
+    X_pred = a1*X;
+    P_pred = a1 * P * a1 + Q;
+    %Update/correction steps
+    %1. Check if we have one or two contracts:
+    d = length(K{t});
+    
+    if d == 2
+        y = obs{t}'; % Get the observation
+        y_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        err_t = (y - y_pred );% This should be 2x1
+        H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)' ;%2x1
+        S = H * P_pred*H' + R*eye(d);
+        Kg = P_pred * H' / S;
+        X = X_pred + Kg * err_t;
+        P = (1 - Kg * H) * P_pred;
+        
+    else
+ 
+        y = obs{t}; % Get the observation
+        y_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred);
+        err_t = (y - y_pred )';% This should be 2x1
+        H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)'; %2x1
+        S = H * P_pred*H' + R*eye(d);
+        Kg = P_pred * H' / S;
+        X = X_pred + Kg * err_t;
+        P = (1 - Kg * H) * P_pred;
+    end
+    X_est(:, t) = X;
+end
+plot(X_est.^2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%%
+    % Number of time steps
+    N = 500; % Example - modify as per your data
+
+    % State initialization (Implied Volatility)
+    X = 0.2; % Initial implied volatility (example value)
+    P = 1; % Initial state covariance
+    Q=1 %meas noise
+
+    % AR(1) process parameters
+    alpha = 0.9; % AR(1) coefficient
+    process_noise_variance = 2; % Process noise variance
+
+    % Storage for EKF estimates
+    X_est = zeros(1, N);
+
+    for t = 1:N
+        d=length(K{t})
+        % Prediction step
+        X_pred = alpha * X; % AR(1) state transition
+        F = alpha; % Jacobian of the state transition
+        P_pred = F * P * F' + process_noise_variance;
+
+        % Update step
+        
+        
+        Z= y_mid{t}'
+        num_obs=d; % Fetch observations for time t
+        Z_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)' %Pred obs
+        H= dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)'
+        R = Q*eye(d); % Measurement noise covariance
+        
+        Y = Z - Z_pred; % Innovation
+        S = H * P_pred * H' + R; % Innovation covariance
+        Kt = P_pred * H' / S; % Kalman Gain
+        X = X_pred + Kt * Y; % State update
+        P = (1 - Kt * H) * P_pred; % Covariance update
+
+        % Store estimates
+        X_est(t) = X;
+    end
+
+    % Plot or further process X_est as required
+
+%%
+% Range of alpha values to test
+alpha_values = -0.99:0.01:0.99; % Adjust the step size as needed
+
+% Store errors for each alpha
+alpha_errors = zeros(length(alpha_values), 1);
+
+% Number of time steps
+N = 500; % Example - modify as per your data
+
+% Measurement noise
+Q = 1; % Measurement noise
+
+% Iterate over alpha values
+for a = 1:length(alpha_values)
+    alpha = alpha_values(a); % Current alpha value
+
+    % Reset the state initialization for each run
+    X = 0.2; % Initial implied volatility (example value)
+    P = 1; % Initial state covariance
+    process_noise_variance = 2; % Process noise variance
+
+    % Storage for EKF estimates
+    X_est = zeros(1, N);
+
+    % Run EKF for current alpha
+    for t = 1:N
+        d = length(K{t}); % Number of observations at time t
+        % Prediction step
+        X_pred = alpha * X;
+        F = alpha;
+        P_pred = F * P * F' + process_noise_variance;
+
+        % Update step
+        Z = y_mid{t}';
+        Z_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        R = Q * eye(d);
+
+        Y = Z - Z_pred;
+        S = H * P_pred * H' + R;
+        Kt = P_pred * H' / S;
+        X = X_pred + Kt * Y;
+        P = (1 - Kt * H) * P_pred;
+
+        % Store estimates
+        X_est(t) = X;
+    end
+
+    % Compute error for current alpha
+    total_error = 0;
+    for t = 1:N
+        estimated_prices = bns(s{t}, r{t}, K{t}, tau{t}, X_est(t))';
+        real_prices = y_mid{t}';
+        total_error = total_error + sum((real_prices - estimated_prices).^2);
+    end
+    alpha_errors(a) = total_error;
+end
+
+% Find the best alpha (minimum error)
+[min_error, best_alpha_idx] = min(alpha_errors);
+alpha = alpha_values(best_alpha_idx);
+% Output the best alpha
+% fprintf('Best alpha: %f, with error: %f\n', best_alpha, min_error);
+
+
+
+% Number of time steps
+N = 500; % Example - modify as per your data
+
+% Measurement noise
+Q = 1; % Measurement noise
+
+% Iterate over alpha values
+Qs = linspace(0.0001,20, 1000)
+Q_errors = zeros(length(Qs), 1);
+for a = 1:length(Qs)
+    Q=Qs(a);
+    % alpha = alpha_values(a); % Current alpha value
+
+    % Reset the state initialization for each run
+    X = 0.2; % Initial implied volatility (example value)
+    P = 1; % Initial state covariance
+    process_noise_variance = 2; % Process noise variance
+
+    % Storage for EKF estimates
+    X_est = zeros(1, N);
+
+    % Run EKF for current alpha
+    for t = 1:N
+        d = length(K{t}); % Number of observations at time t
+        % Prediction step
+        X_pred = alpha * X;
+        F = alpha;
+        P_pred = F * P * F' + process_noise_variance;
+
+        % Update step
+        Z = y_mid{t}';
+        Z_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        R = Q * eye(d);
+
+        Y = Z - Z_pred;
+        S = H * P_pred * H' + R;
+        Kt = P_pred * H' / S;
+        X = X_pred + Kt * Y;
+        P = (1 - Kt * H) * P_pred;
+
+        % Store estimates
+        X_est(t) = X;
+    end
+
+    % Compute error for current alpha
+    total_error = 0;
+    for t = 1:N
+        estimated_prices = bns(s{t}, r{t}, K{t}, tau{t}, X_est(t))';
+        real_prices = y_mid{t}';
+        total_error = total_error + sum((real_prices - estimated_prices).^2);
+    end
+    Q_errors(a) = total_error;
+end
+
+[min_errorQ, best_Q_idx] = min(Q_errors);
+Q= Qs(best_Q_idx);
+
+
+% Iterate over alpha values
+process_noise_variances  = linspace(0.0001,20, 1000)
+proc_errors = zeros(length(process_noise_variances ), 1);
+for a = 1:length(process_noise_variances )
+    process_noise_variance = process_noise_variances(a)
+    % alpha = alpha_values(a); % Current alpha value
+
+    % Reset the state initialization for each run
+    X = 0.2; % Initial implied volatility (example value)
+    P = 1; % Initial state covariance
+
+    % Storage for EKF estimates
+    X_est = zeros(1, N);
+
+    % Run EKF for current alpha
+    for t = 1:N
+        d = length(K{t}); % Number of observations at time t
+        % Prediction step
+        X_pred = alpha * X;
+        F = alpha;
+        P_pred = F * P * F' + process_noise_variance;
+
+        % Update step
+        Z = y_mid{t}';
+        Z_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        R = Q * eye(d);
+
+        Y = Z - Z_pred;
+        S = H * P_pred * H' + R;
+        Kt = P_pred * H' / S;
+        X = X_pred + Kt * Y;
+        P = (1 - Kt * H) * P_pred;
+
+        % Store estimates
+        X_est(t) = X;
+    end
+
+    % Compute error for current alpha
+    total_error = 0;
+    for t = 1:N
+        estimated_prices = bns(s{t}, r{t}, K{t}, tau{t}, X_est(t))';
+        real_prices = y_mid{t}';
+        total_error = total_error + sum((real_prices - estimated_prices).^2);
+    end
+    proc_errors(a) = total_error;
+end
+
+[min_errorP, best_P_idx] = min(proc_errors);
+process_noise_variance= process_noise_variances(best_P_idx);
+%%
+% process_noise_variance = 1
+% R=1
+Q= 6.2063
+for t = 1:N
+        d = length(K{t}); % Number of observations at time t
+        % Prediction step
+        X_pred = alpha * X;
+        F = alpha;
+        P_pred = F * P * F' + process_noise_variance;
+
+        % Update step
+        Z = y_mid{t}';
+        Z_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)';
+        R = Q * eye(d);
+
+        Y = Z - Z_pred;
+        S = H * P_pred * H' + R;
+        Kt = P_pred * H' / S;
+        X = X_pred + Kt * Y;
+        P = (1 - Kt * H) * P_pred;
+
+        % Store estimates
+        X_est(t) = X;
+end
+figure
+plot(X_est)
+hold on
+figure
+plot(diff(cell2mat(s_mid)))
+hold off
+%%
+
+% Set known parameters
+alpha = 0.9; % Known alpha value for AR(1) process
+process_noise_variance = 2; % Process noise variance
+measurement_noise_variance = 2.4; % Measurement noise variance
+N = 500; % Number of time steps (modify as per your data)
+
+% Initial state and covariance
+X = 0.01; % Initial implied volatility estimate
+P = 1; % Initial state covariance
+
+% Storage for EKF estimates
+X_est = zeros(1, N);
+alpha=0.8 % meas, proc, alpha that works (2.4, 1, -0.9)
+a1s = linspace(-0.99, 0.99, 1000)
+errorsa = zeros(1, length(a1s))
+% Run EKF
+for a =1:length(a1s)
+    alpha = a1s(a);
+for t = 1:N
+    % Prediction step
+    X_pred = alpha * X; % AR(1) state transition
+    F = alpha; % Jacobian of the state transition
+    P_pred = F * P * F' + process_noise_variance;
+
+    % Update step
+    d = length(K{t}); % Number of observations at time t
+    Z = y_mid{t}'; % Observations (option prices)
+    Z_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)'; % Predicted observations
+    H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)'; % Jacobian
+    R = measurement_noise_variance * eye(d); % Measurement noise covariance
+
+    Y = Z - Z_pred; % Innovation
+    S = H * P_pred * H' + R; % Innovation covariance
+    Kt = P_pred * H' / S; % Kalman Gain
+    X = X_pred + Kt * Y; % Update state
+    P = (1 - Kt * H) * P_pred; % Update covariance
+
+    % Store estimates
+    X_est(t) = X;
+end
+total_error = 0
+for t = 1:N
+        estimated_prices = bns(s{t}, r{t}, K{t}, tau{t}, X_est(t))';
+        real_prices = y_mid{t}';
+        total_error = total_error + sum((real_prices - estimated_prices).^2);
+end
+errorsa(a)= total_error;
+end
+
+   % Post-processing or plotting of X_est as required
+
+%%
+
+[min_error, best_a_idx] = min(errorsa);
+alpha= 0.9;
+process_noise_variance = 2; % Process noise variance
+measurement_noise_variance = 2.4;
+P = 1
+X=0.1
+for t = 1:N
+    % Prediction step
+    X_pred = alpha * X; % AR(1) state transition
+    F = alpha; % Jacobian of the state transition
+    P_pred = F * P * F' + process_noise_variance;
+
+    % Update step
+    d = length(K{t}); % Number of observations at time t
+    Z = y_mid{t}'; % Observations (option prices)
+    Z_pred = bns(s{t}, r{t}, K{t}, tau{t}, X_pred)'; % Predicted observations
+    H = dbns(s{t}, r{t}, K{t}, tau{t}, X_pred)'; % Jacobian
+    R = measurement_noise_variance * eye(d); % Measurement noise covariance
+
+    Y = Z - Z_pred; % Innovation
+    S = H * P_pred * H' + R; % Innovation covariance
+    Kt = P_pred * H' / S; % Kalman Gain
+    X = X_pred + Kt * Y; % Update state
+    P = (1 - Kt * H) * P_pred; % Update covariance
+
+    % Store estimates
+    X_est(t) = X;
+end
+plot(X_est)
