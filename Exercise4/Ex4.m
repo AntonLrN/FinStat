@@ -1,103 +1,46 @@
-%prep are chap 8.1, 12, 14 and hand outs. Also look at equation 11.98 and
-%11.99
-load CIRstruct2.mat
-% CIR Model Parameters
-r = cir.data'
-kappa = cir.a % a
-theta = cir.b; % b
-sigma = cir.s % sigma
-ONV = var(r) % obs noise var, good choice?
-% dt, monthly
-dt = 1/12;
-
-% init state and cov. 
-x_est = r(1); % init state est
-P_est = 1;    % error cov
-
-N = length(r);
-
-x_estimates = zeros(N, 1);
-
-% Kalman Filter Implementation
-for i = 1:N
-    % pred step
-    x_pred = x_est + kappa * (theta - x_est) * dt;
-    P_pred = P_est + sigma^2 * x_est * dt; 
-
-    % update step
-    K = P_pred / (P_pred + ONV); % the gain
-    x_est = x_pred + K * (r(i) - x_pred);
-    P_est = (1 - K) * P_pred;
-    x_estimates(i) = x_est;
-end
-
-% plot the stuff
-plot(1:N, r, 'b', 1:N, x_estimates, 'r');
-legend('Observed', 'Estimated');
-xlabel('Time Step');
-ylabel('Short Rate');
-title('Kalman Filter Estimation of Short Rate');
-%%
-a= kappa
-b=theta
-s=sigma
-T=1/4
-Y = -1/T*(log(A(T,[1:N]', kappa, theta, sigma))-B(T,[1:N]', kappa, sigma).*x_estimates);
 
 %%
-plot(1:N, yhat(:,3), 'b', 1:N, Y, 'r');
-legend('Observed', 'Estimated');
-xlabel('Time Step');
-ylabel('Short Rate');
-title('Kalman Filter Estimation of Short Rate');
-
-%%
-load StochVol.mat
-% Model Parameters
 kappa0 = -2;
 kappa1 = 0.7;
 tau = 1;
-V=Z
-% Observation data (log of squared volatility)
-logV2 = log(V.^2);
+eta = -(log(2) + 0.5772);
+variance = pi^2 / 2;
 
-% Number of data points
-N = length(logV2);
 
-% Initialize the state estimate and error covariance
-logSigma2_est = 0.1; % Initial state estimate
-P_est = 1;    % Initial error covariance
 
-% Allocate memory for storing estimates
-logSigma2_estimates = zeros(N, 1);
+% ladda data
+load('StochVol.mat'); 
+data = Z
 
-% Kalman Filter Implementation
-for i = 2:N
-    % Prediction Step
-    logSigma2_pred = kappa0 + kappa1 * logSigma2_est;
-    P_pred = P_est + tau^2; % Process noise variance
+n = length(data);
+log_sigma2 = zeros(n, 1); % log(sigma^2)
+log_sigma2(1) = kappa0; % init cond
 
-    % Observation model - Gaussian approximation of noise
-    eta = -1.2704
-    R = pi^2 / 2; % Observation noise variance
+%  kal init
+Q = tau^2; % process noise variance
+R = variance; % meas noise variance
+P = 1; % init estimate of state covariance
 
-    % Update Step
-    K = P_pred / (P_pred + R); % Kalman gain
-    logSigma2_est = logSigma2_pred + K * (logV2(i) - logSigma2_pred - eta);
-    P_est = (1 - K) * P_pred;
+for t = 2:n
+    % pred step
+    log_sigma2_pred = kappa0 + kappa1 * log_sigma2(t-1);
+    P_pred = kappa1^2 * P + Q; %
 
-    % Store the estimate
-    logSigma2_estimates(i) = logSigma2_est;
+    % update step
+    z_t = data(t); % measurement at time t
+    log_z2_t = log(z_t^2); % log(z^2_t)
+    y = log_z2_t - log_sigma2_pred; % meas innov
+    S = P_pred + R; % innov cov
+    K = P_pred / S; % Kal gain
+    log_sigma2(t) = log_sigma2_pred + K * (y-eta); % updated state estimate
+    P = (1 - K) * P_pred; % updated estimate of state covariance
 end
-
-% Convert log volatility back to volatility for comparison
-Sigma2_estimates = exp(logSigma2_estimates);
-
-% Plotting the results
-plot(1:N, V.^2, 'b', 1:N, Sigma2_estimates, 'r');
-legend('Observed Volatility', 'Estimated Volatility');
-xlim([2 1000])
-xlabel('Time Step');
-ylabel('Volatility');
-title('Kalman Filter Estimation of Volatility Process');
-
+mean(log_z2_t)
+% 
+plot(log_sigma2);
+hold on
+plot(V)
+hold off
+xlabel('time');
+ylabel('log(sigma^2)');
+title('estimated volatility process');

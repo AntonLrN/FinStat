@@ -35,7 +35,7 @@ P = 1
 R = var_obs; %Meas noise
 Q = 1; % Process noise
 
-X=0.1 % this is the best estimate at every step, saved to my final X_est
+X=0.01 % this is the best estimate at every step, saved to my final X_est
 
 a1s = linspace(-0.999, 0.999, 1000)
 errort = zeros(1,N)
@@ -86,10 +86,9 @@ X_est = zeros(1, N);
 ys = zeros(1, N)
 P = 1
 R = 2.5; %Meas noise
-Q = 2; % Process noise
+Q = 1; % Process noise
 X=0.1 % this is the best estimate at every step, saved to my final X_est
-% a1 =  a1s(minIndex
-a1=2
+% a1 =  a1s(minIndex)
 for t=1:N
     X_pred = a1*X;
     P_pred = a1 * P * a1 + Q;
@@ -151,7 +150,7 @@ plot(X_est.^2)
 
 
 
-%% THIS ONE WORKS OK I THINK
+%%
     % Number of time steps
     N = 500; % Example - modify as per your data
 
@@ -162,7 +161,7 @@ plot(X_est.^2)
 
     % AR(1) process parameters
     alpha = 0.9; % AR(1) coefficient
-    process_noise_variance = 2.4; % Process noise variance
+    process_noise_variance = 2; % Process noise variance
 
     % Storage for EKF estimates
     X_est = zeros(1, N);
@@ -418,7 +417,7 @@ P = 1; % Initial state covariance
 % Storage for EKF estimates
 X_est = zeros(1, N);
 alpha=0.8 % meas, proc, alpha that works (2.4, 1, -0.9)
-a1s = linspace(-1, 1, 1000)
+a1s = linspace(-0.99, 0.99, 1000)
 errorsa = zeros(1, length(a1s))
 % Run EKF
 for a =1:length(a1s)
@@ -445,7 +444,7 @@ for t = 1:N
     % Store estimates
     X_est(t) = X;
 end
-total_error = 0;
+total_error = 0
 for t = 1:N
         estimated_prices = bns(s{t}, r{t}, K{t}, tau{t}, X_est(t))';
         real_prices = y_mid{t}';
@@ -456,12 +455,12 @@ end
 
    % Post-processing or plotting of X_est as required
 
-%% THIS ONE WORKS OK
+%%
 
 [min_error, best_a_idx] = min(errorsa);
-alpha= a1s(best_a_idx);
-process_noise_variance = 1; % Process noise variance
-measurement_noise_variance = 2.5;
+alpha= 0.9;
+process_noise_variance = 2; % Process noise variance
+measurement_noise_variance = 2.4;
 P = 1
 X=0.1
 for t = 1:N
