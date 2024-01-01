@@ -1,6 +1,6 @@
 ListA= [100.15 0.04 [105,100] 0.2460 [1.5 3.5]];
 
-
+load ProjectOptionData.mat
 y_ask = {OptData.Callask};
 y_bid = {OptData.Callbid};
 s_ask = {OptData.Sask};
@@ -11,31 +11,81 @@ K = {OptData.K};
 y_mid = cell(length(y_bid),1);
 s_mid = cell(length(y_bid),1);
 for i =1:length(y_ask)
-    y_mid{i} = (y_ask{:,i} + y_bid{:,i})/2 +randn([ length(K{i}) 1])'/4 ;
+    spread = abs(y_ask{:,i} - y_bid{:,i});
+    y_mid{i} = (y_ask{:,i} + y_bid{:,i})/2 +randn([ length(K{i}) 1])'.*spread./4;
     s_mid{i} = (s_ask{:,i} + s_bid{:,i})/2+ +randn'/4;
 end
 N=length(OptData);
 y_mid_mat =  horzcat(y_mid{:});
 var_obs=var(y_mid_mat)
 
+obs = y_mid;
+s = s_mid;
+
+%max of mid price = 8.1602
+ %higher tau, higher price it seems. inverse for K. Higher S higher price. 
+%%
+global X_est
+idx = 16
+% blsprice(s_mid{idx} , K{idx},0.04, tau{idx}, X_est(idx))
+disp("My estimate is:")
+bns(s_mid{idx},0.04 , K{idx}, tau{idx}, X_est(idx))
+disp("Actual price is")
+y_mid{idx}
+
+%% Optimize my AR1
+a1s = linspace(-1,1,100)
+for i
+x0 =[0.3]
+options = optimoptions('fminunc', 'StepTolerance', 1e-6);
+% Create an anonymxous function that passes 'myData' to 'myObjectiveFunction'
+fun = @(x) AR1(x, OptData);
+
+% Now use fminunc
+[x, fval] = fminunc(fun, x0, options);
+
+%% Plots
+AR1(x0, OptData)
+%%
+AR1_It(x0, OptData)
+%% Plot 
+% To plot, we need to first get a cell that has the values. 
+numPoints= 500
+estimatedData = cell(1,500);
+for i = 1:500
+    estimatedData{i} = bns(s_mid{i},0.04 , K{i}, tau{i}, X_est(i));
+end
 
 
+%%
+% Flatten the cell arrays into vectors for scatter plot
+flatEstimated = [];
+flatReal = [];
+for i = 1:500
+    flatEstimated = [flatEstimated, estimatedData{i}];
+    flatReal = [flatReal, realData{i}];
+end
 
-
-
-
+figure;
+title('Comparison of Estimated and Real Data');
+% scatter(flatEstimated, flatReal);
+plot(flatEstimated)
+hold on
+plot(flatReal)
+hold off
+% xlabel('Estimated Values');
+% ylabel('Real Values');
 
 
 %% Kalman Filter
-obs = y_mid
-s = s_mid
+
 X_est = zeros(1, N);
 ys = zeros(1, N)
 P = 1
 R = var_obs; %Meas noise
 Q = 1; % Process noise
 
-X=0.01 % this is the best estimate at every step, saved to my final X_est
+X=0.1 % this is the best estimate at every step, saved to my final X_est
 
 a1s = linspace(-0.999, 0.999, 1000)
 errort = zeros(1,N)
@@ -86,9 +136,10 @@ X_est = zeros(1, N);
 ys = zeros(1, N)
 P = 1
 R = 2.5; %Meas noise
-Q = 1; % Process noise
+Q = 2; % Process noise
 X=0.1 % this is the best estimate at every step, saved to my final X_est
-% a1 =  a1s(minIndex)
+% a1 =  a1s(minIndex
+a1=2
 for t=1:N
     X_pred = a1*X;
     P_pred = a1 * P * a1 + Q;
@@ -150,7 +201,7 @@ plot(X_est.^2)
 
 
 
-%%
+%% THIS ONE WORKS OK I THINK
     % Number of time steps
     N = 500; % Example - modify as per your data
 
@@ -160,8 +211,8 @@ plot(X_est.^2)
     Q=1 %meas noise
 
     % AR(1) process parameters
-    alpha = 0.9; % AR(1) coefficient
-    process_noise_variance = 2; % Process noise variance
+    alpha = 1; % AR(1) coefficient
+    process_noise_variance = 10; % Process noise variance
 
     % Storage for EKF estimates
     X_est = zeros(1, N);
@@ -193,7 +244,7 @@ plot(X_est.^2)
     end
 
     % Plot or further process X_est as required
-
+plot(X_est)
 %%
 % Range of alpha values to test
 alpha_values = -0.99:0.01:0.99; % Adjust the step size as needed
@@ -373,7 +424,7 @@ process_noise_variance= process_noise_variances(best_P_idx);
 %%
 % process_noise_variance = 1
 % R=1
-Q= 6.2063
+% Q= 6.2063
 for t = 1:N
         d = length(K{t}); % Number of observations at time t
         % Prediction step
@@ -417,7 +468,7 @@ P = 1; % Initial state covariance
 % Storage for EKF estimates
 X_est = zeros(1, N);
 alpha=0.8 % meas, proc, alpha that works (2.4, 1, -0.9)
-a1s = linspace(-0.99, 0.99, 1000)
+a1s = linspace(-1, 1, 1000)
 errorsa = zeros(1, length(a1s))
 % Run EKF
 for a =1:length(a1s)
@@ -444,7 +495,7 @@ for t = 1:N
     % Store estimates
     X_est(t) = X;
 end
-total_error = 0
+total_error = 0;
 for t = 1:N
         estimated_prices = bns(s{t}, r{t}, K{t}, tau{t}, X_est(t))';
         real_prices = y_mid{t}';
@@ -455,14 +506,17 @@ end
 
    % Post-processing or plotting of X_est as required
 
-%%
+%% THIS ONE WORKS OK
 
-[min_error, best_a_idx] = min(errorsa);
-alpha= 0.9;
-process_noise_variance = 2; % Process noise variance
-measurement_noise_variance = 2.4;
+% [min_error, best_a_idx] = min(errorsa);
+% alpha= a1s(best_a_idx);
+alpha = 1
+process_noise_variance = 1; % Process noise variance
+measurement_noise_variance = 1;
 P = 1
+X_est = zeros(1, N);
 X=0.1
+total_error = 0;
 for t = 1:N
     % Prediction step
     X_pred = alpha * X; % AR(1) state transition
@@ -484,5 +538,12 @@ for t = 1:N
 
     % Store estimates
     X_est(t) = X;
+    
+    estimated_prices = bns(s{t}, r{t}, K{t}, tau{t}, X_est(t))';
+    real_prices = y_mid{t}';
+    total_error = total_error + sum((real_prices - estimated_prices).^2);
+    
+    
 end
+MSE = total_error/N
 plot(X_est)
